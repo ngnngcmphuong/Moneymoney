@@ -10,7 +10,7 @@
     <div style="flex-shrink: 0; font-size: 40px;">💡</div>
     <div>
         <h3>🪴 Hành trình bắt đầu!</h3>
-        <p>Bạn mới đạt 0.0% mục tiêu thu nhập. Hôm nay là ngày tuyệt vời để bắt đầu bứt phá! Hãy nhập giao dịch đầu tiên.</p>
+        <p>Hôm nay là ngày tuyệt vời để bắt đầu bứt phá! Hãy nhập những giao dịch đầu tiên.</p>
     </div>
 </div>
 
@@ -18,33 +18,33 @@
     <div class="stat-card income-card">
         <div class="stat-label">Tổng Thu (Tháng)</div>
         <div class="stat-value">{{ vnd(kpi_data.income) }}đ</div>
-        <div class="stat-change color-success">
+        <!-- <div class="stat-change color-success">
             ↑ 10% 
-        </div>
+        </div> -->
     </div>
 
     <div class="stat-card expense-card">
         <div class="stat-label">Tổng Chi (Tháng)</div>
         <div class="stat-value">{{ vnd(kpi_data.expense) }}đ</div>
-        <div class="stat-change color-danger">
+        <!-- <div class="stat-change color-danger">
             ↓ 5% 
-        </div>
+        </div> -->
     </div>
 
     <div class="stat-card balance-card">
         <div class="stat-label">Số Dư Tổng</div>
         <div class="stat-value">{{ vnd(kpi_data.balance) }}đ</div>
-        <div class="stat-change color-secondary">
+        <!-- <div class="stat-change color-secondary">
              ↓ 5%
-        </div>
+        </div> -->
     </div>
 
     <div class="stat-card saving-card">
         <div class="stat-label">Tỷ Lệ Tiết Kiệm</div>
-        <div class="stat-value">{{ kpi_data.saving_pct | round(1) }}%</div>
-        <div class="stat-change color-success">
+        <div class="stat-value">{{ kpi_data.saving_pct | default(0) | round(1) }}%</div>
+        <!-- <div class="stat-change color-success">
             ↑ 2% 
-        </div>
+        </div> -->
     </div>
 </div>
 
@@ -104,9 +104,10 @@
     const categoryLabels = JSON.parse('{{ category_labels_json | safe }}');
     const categoryValues = JSON.parse('{{ category_values_json | safe }}');
     
-    const monthlyLabels = ['Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12']; 
-    const monthlyIncome = [20000, 18000, 22000, 19000, 21000, 25000];
-    const monthlyExpenseRaw = [10000, 12000, 15000, 11000, 14000, 16000]; 
+   // Lấy dữ liệu 6 tháng thật từ MySQL qua Flask
+    const monthlyLabels = JSON.parse('{{ monthly_labels_json | safe }}'); 
+    const monthlyIncome = JSON.parse('{{ monthly_income_json | safe }}');
+    const monthlyExpenseRaw = JSON.parse('{{ monthly_expense_json | safe }}');
     const monthlyExpenseNegative = monthlyExpenseRaw.map(v => -v); 
     
 

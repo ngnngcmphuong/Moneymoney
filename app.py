@@ -1,206 +1,385 @@
-from flask import Flask, render_template, request, redirect, url_for
-import pandas as pd
+from flask import Flask, render_template, request, redirect, url_for, session
 import json
 from datetime import datetime
+import pandas as pd
 
-# ======================================================
-# 1. CẤU HÌNH VÀ KHỞI TẠO FLASK
-# ======================================================
+from auth import auth
+from db import get_connection
+
+# =========================
+# KHỞI TẠO APP
+# =========================
 app = Flask(__name__)
-app.secret_key = 'super_secret_key_for_loopmind_app' 
+app.secret_key = "super_secret_key_for_moneytrack_app"  # Nên thay bằng secret key an toàn hơn trong production
+app.register_blueprint(auth)
 
-# Hàm tiện ích VND (giữ nguyên)
-def vnd(x):
-    """Định dạng tiền tệ Việt Nam đồng (để dùng trong template)"""
-    return f"{abs(x):,.0f}".replace(",", ".")
+# =========================
+# HÀM HỖ TRỢ
+# =========================
+def vnd(tien):
+    try:
+        return f"{abs(float(tien or 0)):,.0f}".replace(",", ".")
+    except:
+        return "0"
 
-app.jinja_env.globals.update(vnd=vnd)
-# Thêm datetime vào globals để sử dụng trong HTML cho input type="date"
-app.jinja_env.globals.update(datetime=datetime) 
+app.jinja_env.globals.update(vnd=vnd, datetime=datetime)
 
-
-# ======================================================
-# 2. DỮ LIỆU CÓ THỂ SỬA ĐỔI (Dùng biến toàn cục)
-# ======================================================
-
-# DataFrames sẽ được sửa đổi
-global TRANSACTIONS_DATA
-global DEBT_LOAN_DATA
-
-# Dữ liệu mẫu cho Thu Chi
-TRANSACTIONS_DATA = pd.DataFrame({
-    'NGÀY': ['2025-12-15', '2025-12-14', '2025-12-13', '2025-12-12', '2025-12-11'],
-    'MÔ TẢ': ['Lương tháng 12', 'Thanh toán tiền nhà', 'Mua hàng trên Tiki', 'Tiền bán hàng online', 'Chi phí đi lại'],
-    'SỐ TIỀN': [35_000_000, -8_000_000, -1_500_000, 2_000_000, -500_000],
-    'DANH MỤC': ['Thu nhập', 'Nhà ở', 'Mua sắm', 'Thu nhập', 'Vận chuyển'],
-    'QUỸ (JAR)': ['Tiêu dùng', 'Nhu cầu', 'Nhu cầu', 'Tiêu dùng', 'Nhu cầu']
-})
-TRANSACTIONS_DATA['NGÀY'] = pd.to_datetime(TRANSACTIONS_DATA['NGÀY'])
-
-# Dữ liệu mẫu cho Vay Nợ
-DEBT_LOAN_DATA = pd.DataFrame({
-    'NGÀY BẮT ĐẦU': ['2025-11-01', '2025-12-05'],
-    'ĐỐI TƯỢNG': ['Ngân hàng A', 'Bạn B'],
-    'LOẠI': ['VAY NỢ', 'CHO VAY'],
-    'TỔNG TIỀN': [50_000_000, 15_000_000],
-    'ĐÃ THANH TOÁN': [10_000_000, 0],
-    'CÒN LẠI': [40_000_000, 15_000_000],
-})
-
-
-# ======================================================
-# 3. ROUTES HIỂN THỊ (GET)
-# ======================================================
-
+# =========================
+# DASHBOARD
+# =========================
 @app.route('/')
 @app.route('/dashboard')
 def dashboard():
-    # Tính toán KPI động
-    income_kpi = TRANSACTIONS_DATA[TRANSACTIONS_DATA['SỐ TIỀN'] > 0]['SỐ TIỀN'].sum()
-    expense_kpi = TRANSACTIONS_DATA[TRANSACTIONS_DATA['SỐ TIỀN'] < 0]['SỐ TIỀN'].sum() * -1
-    balance_kpi = TRANSACTIONS_DATA['SỐ TIỀN'].sum()
-    
-    KPI_DATA = {
-        "income": income_kpi,
-        "expense": expense_kpi,
-        "balance": balance_kpi,
-        "saving_pct": 26.2, 
-        "category_data": {"Ăn uống": 7000, "Nhà ở": 5000, "Vận chuyển": 3500, "Giáo dục": 4000, "Giải trí": 3000, "Khác": 3300},
-        "jar_data": {"Nhu cầu": 13000, "Giáo dục": 5000, "Tiết kiệm": 7800},
-    }
-    
-    category_labels = list(KPI_DATA['category_data'].keys())
-    category_values = list(KPI_DATA['category_data'].values())
-    jar_labels = list(KPI_DATA['jar_data'].keys())
-    jar_values = list(KPI_DATA['jar_data'].values())
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
 
-    context = {
-        'page': 'dashboard',
-        'kpi_data': KPI_DATA,
-        'category_labels_json': json.dumps(category_labels),
-        'category_values_json': json.dumps(category_values),
-        'jar_labels_json': json.dumps(jar_labels),
-        'jar_values_json': json.dumps(jar_values),
-    }
-    return render_template('dashboard.html', **context)
+    conn = get_connection()
+    id_nguoi_dung = session['user_id']
 
+    # Sử dụng JOIN để lấy category_name thay vì category_id
+    cau_lenh = """
+        SELECT t.*, c.category_name 
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE t.user_id = %s
+    """
+    bang = pd.read_sql(cau_lenh, conn, params=(id_nguoi_dung,))
 
+    if bang.empty:
+        conn.close()
+        return render_template(
+            'dashboard.html',
+            page='dashboard',
+            kpi_data={"income": 0, "expense": 0, "balance": 0, "saving_pct": 0},
+            monthly_labels_json=json.dumps([]),
+            monthly_income_json=json.dumps([]),
+            monthly_expense_json=json.dumps([]),
+            category_labels_json=json.dumps([]),
+            category_values_json=json.dumps([]),
+            username=session.get('username')
+        )
+
+    bang['amount'] = bang['amount'].astype(float)
+    bang['date'] = pd.to_datetime(bang['date'])
+
+    tong_thu = bang[bang['transaction_type'] == 'income']['amount'].sum()
+    tong_chi = bang[bang['transaction_type'] == 'expense']['amount'].sum()
+    so_du = tong_thu - tong_chi
+
+    if tong_thu > 0:
+        phan_tram_tiet_kiem = (so_du / tong_thu) * 100
+    else:
+        phan_tram_tiet_kiem = 0
+
+    # BIỂU ĐỒ TRÒN: Group by 'category_name' (nhờ JOIN)
+    bang_loai = bang[bang['transaction_type'] == 'expense']
+    bang_loai = bang_loai.groupby('category_name')['amount'].sum()
+    du_lieu_loai = bang_loai.to_dict()
+
+    # BIỂU ĐỒ THÁNG
+    bang['thang_nam'] = bang['date'].dt.strftime('%m/%Y')
+    bang_thang = bang.groupby(
+        ['thang_nam', 'transaction_type']
+    )['amount'].sum().unstack(fill_value=0)
+
+    bang_thang.index = pd.to_datetime(bang_thang.index, format='%m/%Y')
+    bang_thang = bang_thang.sort_index()
+
+    ds_thang = bang_thang.index.strftime('%m/%Y').tolist()
+
+    if 'income' in bang_thang:
+        ds_thu = bang_thang['income'].tolist()
+    else:
+        ds_thu = [0] * len(ds_thang)
+
+    if 'expense' in bang_thang:
+        ds_chi = bang_thang['expense'].tolist()
+    else:
+        ds_chi = [0] * len(ds_thang)
+
+    conn.close()
+
+    return render_template(
+        'dashboard.html',
+        page='dashboard',
+        kpi_data={
+            "income": float(tong_thu),
+            "expense": float(tong_chi),
+            "balance": float(so_du),
+            "saving_pct": float(phan_tram_tiet_kiem)
+        },
+        monthly_labels_json=json.dumps(ds_thang),
+        monthly_income_json=json.dumps(ds_thu),
+        monthly_expense_json=json.dumps(ds_chi),
+        category_labels_json=json.dumps(list(du_lieu_loai.keys())),
+        category_values_json=json.dumps(list(du_lieu_loai.values())),
+        username=session.get('username')
+    )
+
+# =========================
+# THU - CHI
+# =========================
 @app.route('/thu-chi')
 def thu_chi():
-    global TRANSACTIONS_DATA
-    total_income = TRANSACTIONS_DATA[TRANSACTIONS_DATA['SỐ TIỀN'] > 0]['SỐ TIỀN'].sum()
-    total_expense = TRANSACTIONS_DATA[TRANSACTIONS_DATA['SỐ TIỀN'] < 0]['SỐ TIỀN'].sum()
-    balance = total_income + total_expense
-    
-    context = {
-        'page': 'thu_chi',
-        'income': total_income,
-        'expense': abs(total_expense),
-        'balance': balance,
-        # Sắp xếp và chuyển đổi dữ liệu thành list of dicts cho Jinja
-        'transactions': TRANSACTIONS_DATA.sort_values(by='NGÀY', ascending=False).to_dict('records')
-    }
-    # ĐÃ SỬA LỖI TemplateNotFound: Gọi đúng template income_expense.html
-    return render_template('income_expense.html', **context)
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
 
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
 
+    # 1. Lấy lịch sử giao dịch (JOIN với categories để hiện tên)
+    cursor.execute("""
+        SELECT t.*, c.category_name 
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE t.user_id = %s
+        ORDER BY t.date DESC
+    """, (session['user_id'],))
+    danh_sach = cursor.fetchall()
+
+    # 2. LẤY DANH SÁCH DANH MỤC CHO MODAL
+    cursor.execute("SELECT id, category_name FROM categories")
+    list_categories = cursor.fetchall()
+
+    tong_thu = 0
+    tong_chi = 0
+
+    for dong in danh_sach:
+        if dong['transaction_type'] == 'income':
+            tong_thu += float(dong['amount'])
+        elif dong['transaction_type'] == 'expense':
+            tong_chi += float(dong['amount'])
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "income_expense.html",
+        page="thu_chi",
+        transactions=danh_sach,
+        categories=list_categories,  # Truyền biến này vào HTML cho dropdown
+        income=tong_thu,
+        expense=tong_chi,
+        balance=tong_thu - tong_chi
+    )
+
+# =========================
+# VAY - NỢ
+# =========================
 @app.route('/vay-no')
 def vay_no():
-    global DEBT_LOAN_DATA
-    total_loan = DEBT_LOAN_DATA[DEBT_LOAN_DATA['LOẠI'] == 'CHO VAY']['CÒN LẠI'].sum()
-    total_debt = DEBT_LOAN_DATA[DEBT_LOAN_DATA['LOẠI'] == 'VAY NỢ']['CÒN LẠI'].sum()
-    net_balance = total_loan - total_debt
-    
-    context = {
-        'page': 'vay_no',
-        'total_loan': total_loan,
-        'total_debt': total_debt,
-        'net_balance': net_balance,
-        'debt_loan_items': DEBT_LOAN_DATA.to_dict('records')
-    }
-    return render_template('debt_loan.html', **context)
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
 
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
 
-# ======================================================
-# 4. FORM HANDLERS (ĐÃ IMPLEMENT LOGIC)
-# ======================================================
+    cursor.execute("""
+        SELECT * FROM debt_loans
+        WHERE user_id = %s
+        ORDER BY start_date DESC
+    """, (session['user_id'],))
 
+    danh_sach = cursor.fetchall()
+
+    tong_cho_vay = 0
+    tong_no = 0
+
+    for dong in danh_sach:
+        con_lai = float(dong['total_amount']) - float(dong['paid_amount'])
+        if dong['loan_type'] == 'loan-out':
+            tong_cho_vay += con_lai
+        else:
+            tong_no += con_lai
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "debt_loan.html",
+        page="vay_no",
+        debt_loan_items=danh_sach,
+        total_loan=tong_cho_vay,
+        total_debt=tong_no,
+        net_balance=tong_cho_vay - tong_no
+    )
+
+# =========================
+# THÊM / SỬA / XÓA
+# =========================
 @app.route('/add-transaction', methods=['POST'])
 def add_transaction():
-    global TRANSACTIONS_DATA
-    if request.method == 'POST':
-        # Lấy dữ liệu từ Form
-        amount = int(request.form['amount'])
-        description = request.form['description']
-        category = request.form['category']
-        date = request.form['date']
-        type = request.form['transaction_type'] 
-        
-        # Xử lý dấu của số tiền
-        final_amount = amount if type == 'income' else -amount
-        
-        # Tạo dòng DataFrame mới
-        new_transaction = pd.DataFrame([{
-            'NGÀY': date,
-            'MÔ TẢ': description,
-            'DANH MỤC': category,
-            'SỐ TIỀN': final_amount,
-            'QUỸ (JAR)': 'N/A' # Cần thêm input JAR vào form HTML
-        }])
-        
-        # Thêm vào DataFrame toàn cục
-        TRANSACTIONS_DATA = pd.concat([TRANSACTIONS_DATA, new_transaction], ignore_index=True)
-        TRANSACTIONS_DATA['NGÀY'] = pd.to_datetime(TRANSACTIONS_DATA['NGÀY'])
-        
-        # Chuyển hướng về trang Thu Chi
-        return redirect(url_for('thu_chi'))
-    
-    return redirect(url_for('thu_chi'))
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
 
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO transactions
+        (user_id, amount, category_id, description, transaction_type, date)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (
+        session['user_id'],
+        request.form['amount'],
+        request.form['category_id'],  # Khớp với name trong <select> HTML
+        request.form['description'],
+        request.form['transaction_type'],
+        request.form['date']
+    ))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for('thu_chi'))
 
 @app.route('/add-debt-loan', methods=['POST'])
 def add_debt_loan():
-    global DEBT_LOAN_DATA
-    if request.method == 'POST':
-        # Lấy dữ liệu từ Form
-        loan_type = request.form['loan_type'] # 'loan-out' (Cho Vay) hoặc 'loan-in' (Vay Nợ)
-        related_person = request.form['related_person']
-        amount = int(request.form['amount'])
-        amount_paid = int(request.form.get('amount_paid', 0) or 0)
-        description = request.form['description']
-        date = request.form['date']
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
 
-        # Tính toán giá trị còn lại
-        remaining = amount - amount_paid
-        
-        # Xác định trạng thái
-        if remaining <= 0:
-            status = 'ĐÃ KẾT THÚC'
-            remaining = 0
-        else:
-            status = 'CHƯA TRẢ' if loan_type == 'loan-out' else 'ĐANG NỢ'
-            
-        # Tạo dòng DataFrame mới
-        new_row = pd.DataFrame([{
-            'NGÀY BẮT ĐẦU': date,
-            'ĐỐI TƯỢNG': related_person,
-            'LOẠI': 'CHO VAY' if loan_type == 'loan-out' else 'VAY NỢ',
-            'TỔNG TIỀN': amount, 
-            'ĐÃ THANH TOÁN': amount_paid,
-            'CÒN LẠI': remaining,
-            'TRẠNG THÁI': status
-        }])
-
-        # Thêm vào DataFrame toàn cục
-        DEBT_LOAN_DATA = pd.concat([DEBT_LOAN_DATA, new_row], ignore_index=True)
-
-        return redirect(url_for('vay_no'))
+    # Lấy đúng tên trường 'person' từ form
+    person = request.form.get('person') 
+    loan_type = request.form.get('loan_type')
+    total_amount = request.form.get('total_amount', 0)
+    paid_amount = request.form.get('paid_amount', 0)
+    description = request.form.get('description', '')
+    start_date = request.form.get('start_date')
     
+    # Tự động tính status dựa trên số tiền
+    status = "ĐÃ KẾT THÚC" if float(paid_amount) >= float(total_amount) else "ĐANG NỢ"
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    # Câu lệnh SQL phải dùng đúng tên cột 'person'
+    sql = """INSERT INTO debt_loans 
+             (user_id, start_date, person, loan_type, total_amount, paid_amount, description, status) 
+             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+    cursor.execute(sql, (session['user_id'], start_date, person, loan_type, total_amount, paid_amount, description, status))
+    conn.commit()
+    cursor.close()
+    conn.close()
     return redirect(url_for('vay_no'))
 
+@app.route('/edit-transaction/<int:id>', methods=['POST'])
+def edit_transaction(id):
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
 
-# ======================================================
-# 5. CHẠY ỨNG DỤNG
-# ======================================================
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE transactions
+        SET amount = %s,
+            category_id = %s,
+            description = %s,
+            transaction_type = %s,
+            date = %s
+        WHERE id = %s AND user_id = %s
+    """, (
+        request.form['amount'],
+        request.form['category_id'],
+        request.form['description'],
+        request.form['transaction_type'],
+        request.form['date'],
+        id,
+        session['user_id']
+    ))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for('thu_chi'))
+
+@app.route('/edit-debt-loan/<int:id>', methods=['POST'])
+def edit_debt_loan(id):
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    # 1. Lấy dữ liệu từ form bằng 'person' thay vì 'name'
+    person = request.form.get('person')
+    loan_type = request.form.get('loan_type')
+    total_amount = float(request.form.get('total_amount', 0))
+    paid_amount = float(request.form.get('paid_amount', 0))
+    description = request.form.get('description', '')
+    start_date = request.form.get('start_date')
+
+    # 2. Logic tính toán Status tự động
+    status = "ĐÃ KẾT THÚC" if paid_amount >= total_amount else "ĐANG NỢ"
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    # 3. Câu lệnh SQL UPDATE chính xác với tên cột 'person'
+    sql = """
+        UPDATE debt_loans 
+        SET start_date = %s, 
+            person = %s, 
+            loan_type = %s, 
+            total_amount = %s, 
+            paid_amount = %s, 
+            description = %s, 
+            status = %s
+        WHERE id = %s AND user_id = %s
+    """
+    params = (start_date, person, loan_type, total_amount, paid_amount, description, status, id, session['user_id'])
+    cursor.execute(sql, params)
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for('vay_no')) 
+
+@app.route('/delete-transaction/<int:id>')
+def delete_transaction(id):
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM transactions WHERE id = %s AND user_id = %s",
+        (id, session['user_id'])
+    )
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for('thu_chi'))
+
+@app.route('/delete-debt-loan/<int:id>')
+def delete_debt_loan(id):
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM debt_loans WHERE id = %s AND user_id = %s",
+        (id, session['user_id'])
+    )
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for('vay_no'))
+
+# =========================
+# ĐĂNG XUẤT
+# =========================
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('auth.login'))
+
+# =========================
+# CHẠY SERVER
+# =========================
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)  # Tắt debug trong production

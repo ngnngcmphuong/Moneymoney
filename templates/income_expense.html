@@ -1,154 +1,143 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h1>Theo dõi thu chi</h1>
+<h1>Theo dõi thu chi</h1>
 
-    <div class="row">
-        <div class="col-4">
-            <div class="card kpi-finance-card">
-                <div class="kpi-label">Tổng thu nhập</div>
-                <div class="kpi-value color-success">{{ vnd(income) }} đ</div>
-            </div>
-        </div>
-        <div class="col-4">
-            <div class="card kpi-finance-card">
-                <div class="kpi-label">Tổng chi tiêu</div>
-                <div class="kpi-value color-danger">{{ vnd(expense) }} đ</div>
-            </div>
-        </div>
-        <div class="col-4">
-            <div class="card kpi-finance-card">
-                <div class="kpi-label">Số dư ròng</div>
-                <div class="kpi-value color-primary">{{ vnd(balance) }} đ</div>
-            </div>
+<!-- KPI -->
+<div class="row">
+    <div class="col-4">
+        <div class="card kpi-finance-card">
+            <div class="kpi-label">Tổng thu nhập</div>
+            <div class="kpi-value color-success">{{ vnd(income) }} đ</div>
         </div>
     </div>
-    
-    <div class="row" style="align-items: center; justify-content: space-between; margin-bottom: 10px; margin-top: 30px;">
-        <div class="col-6">
-            <h2>Lịch sử giao dịch</h2>
-        </div>
-        <div class="col-6" style="text-align: right;">
-            <button class="btn btn-primary" id="open-transaction-modal">➕ Thêm giao dịch</button>
+    <div class="col-4">
+        <div class="card kpi-finance-card">
+            <div class="kpi-label">Tổng chi tiêu</div>
+            <div class="kpi-value color-danger">{{ vnd(expense) }} đ</div>
         </div>
     </div>
+    <div class="col-4">
+        <div class="card kpi-finance-card">
+            <div class="kpi-label">Số dư ròng</div>
+            <div class="kpi-value color-primary">{{ vnd(balance) }} đ</div>
+        </div>
+    </div>
+</div>
 
-    <div class="card" style="padding: 0;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width: 10%;">NGÀY</th>
-                    <th style="width: 35%;">MÔ TẢ</th>
-                    <th style="width: 20%;">DANH MỤC</th>
-                    <th style="width: 15%;">SỐ TIỀN</th>
-                    <th style="width: 20%; text-align: center;">THAO TÁC</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for tx in transactions %}
-                <tr>
-                    <td>{{ tx.NGÀY }}</td>
-                    <td>{{ tx['MÔ TẢ'] }}</td>
-                    <td>{{ tx['DANH MỤC'] }}</td>
-                    <td class="{% if tx['SỐ TIỀN'] > 0 %}color-success{% else %}color-danger{% endif %}">
-                        {{ vnd(tx['SỐ TIỀN']|abs) }} đ
-                    </td>
-                    <td style="text-align: center;">
-                        <button class="btn btn-secondary" style="padding: 6px 10px; margin-right: 5px;">Sửa</button>
-                        <button class="btn btn-danger" style="padding: 6px 10px;">Xóa</button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- HEADER -->
+<div class="row" style="margin-top:30px;">
+    <div class="col-6">
+        <h2>Lịch sử giao dịch</h2>
     </div>
-    
-    <div class="modal-overlay" id="transaction-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                Thêm giao dịch mới
-                <span class="modal-close">&times;</span>
+    <div class="col-6" style="text-align:right;">
+        <button class="btn btn-primary" id="open-transaction-modal">
+            ➕ Thêm giao dịch
+        </button>
+    </div>
+</div>
+
+<!-- TABLE -->
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>NGÀY</th>
+                <th>MÔ TẢ</th>
+                <th>DANH MỤC</th>
+                <th>SỐ TIỀN</th>
+                <th style="text-align:center;">THAO TÁC</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tx in transactions %}
+            <tr>
+                <td>{{ tx.date }}</td>
+                <td>{{ tx.description }}</td>
+                <td><span class="badge badge-info">{{ tx.category_name }}</span></td>
+                <td class="{% if tx.transaction_type == 'income' %}color-success{% else %}color-danger{% endif %}">
+                    {% if tx.transaction_type == 'expense' %}-{% endif %}
+                    {{ vnd(tx.amount) }} đ
+                </td>
+                <td style="text-align:center;">
+                    <button
+                        class="btn btn-secondary btn-edit-tx"
+                        data-action="{{ url_for('edit_transaction', id=tx.id) }}"
+                        data-amount="{{ tx.amount }}"
+                        data-desc="{{ tx.description }}"
+                        data-catid="{{ tx.category_id }}"
+                        data-date="{{ tx.date }}"
+                        data-type="{{ tx.transaction_type }}"
+                    >
+                        Sửa
+                    </button>
+
+                    <a href="{{ url_for('delete_transaction', id=tx.id) }}"
+                       class="btn btn-danger"
+                       onclick="return confirm('Xóa giao dịch này?')">
+                        Xóa
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="transaction-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            Giao dịch
+            <span class="modal-close">&times;</span>
+        </div>
+
+        <!-- ⚠️ ACTION MẶC ĐỊNH -->
+        <form id="transaction-form"
+              method="POST"
+              action="{{ url_for('add_transaction') }}">
+
+           
+
+            <div class="toggle-group">
+                 <input type="hidden"
+                   name="transaction_type"
+                   value="income">
+                <div class="toggle-btn income active" data-type="income">Thu</div>
+                <div class="toggle-btn expense" data-type="expense">Chi</div>
             </div>
-            
-            <form action="{{ url_for('add_transaction') }}" method="POST">
-                <div class="form-group">
-                    <label>LOẠI GIAO DỊCH</label>
-                    <div class="toggle-group" id="transaction-type-toggle">
-                        <input type="hidden" name="transaction_type" id="transaction-type-input" value="income">
-                        
-                        <div class="toggle-btn active income" data-type="income">Thu nhập</div>
-                        <div class="toggle-btn expense" data-type="expense">Chi tiêu</div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="amount">SỐ TIỀN (VNĐ)</label>
-                    <input type="number" id="amount" name="amount" required placeholder="0">
-                </div>
 
-                <div class="form-group">
-                    <label for="description">MÔ TẢ</label>
-                    <textarea id="description" name="description" placeholder="Mô tả giao dịch" rows="2"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="category">DANH MỤC</label>
-                    <select id="category" name="category" required>
-                        <option value="Lương">Lương</option>
-                        <option value="Thưởng">Thưởng</option>
-                        <option value="Bán hàng">Bán hàng</option>
-                        <option value="Ăn uống">Ăn uống</option>
-                        <option value="Mua sắm">Mua sắm</option>
-                        <option value="Di chuyển">Di chuyển</option>
-                        <option value="Nhà ở">Nhà ở</option>
-                        <option value="Khác">Khác</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="date">NGÀY</label>
-                    <input type="date" id="date" name="date" required value="{{ datetime.now().strftime('%Y-%m-%d') }}">
-                </div>
+            <div class="form-group">
+                <label>SỐ TIỀN</label>
+                <input type="number" name="amount" id="amount" required>
+            </div>
 
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-cancel">Hủy</button>
-                    <button type="submit" class="btn btn-primary">Lưu giao dịch</button>
-                </div>
-            </form>
-        </div>
+            <div class="form-group">
+                <label>MÔ TẢ</label>
+                <textarea name="description" id="description"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>DANH MỤC</label>
+                <select name="category_id" id="category_id" class="form-control" required>
+                    <option value="" disabled selected>-- Chọn danh mục --</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.category_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>NGÀY</label>
+                <input type="date" name="date" id="date" required>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-cancel">Hủy</button>
+                <button type="submit" class="btn btn-primary">Lưu</button>
+            </div>
+        </form>
     </div>
+</div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const modal = document.getElementById('transaction-modal');
-        const openBtn = document.getElementById('open-transaction-modal');
-        const closeBtn = modal.querySelector('.modal-close');
-        const cancelBtn = modal.querySelector('.btn-cancel');
-        const typeToggle = document.getElementById('transaction-type-toggle');
-        const typeInput = document.getElementById('transaction-type-input');
-        
-        const closeModal = () => { modal.style.display = 'none'; };
-        const openModal = () => { modal.style.display = 'flex'; };
-
-        openBtn.addEventListener('click', openModal);
-
-        closeBtn.addEventListener('click', closeModal);
-        cancelBtn.addEventListener('click', closeModal);
-
-        window.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
-        
-        typeToggle.querySelectorAll('.toggle-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                typeToggle.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
-                            this.classList.add('active');
-                
-                typeInput.value = this.dataset.type;
-            });
-        });
-    });
-</script>
 {% endblock %}

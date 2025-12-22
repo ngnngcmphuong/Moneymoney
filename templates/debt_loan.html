@@ -37,29 +37,50 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width: 10%;">NGÀY</th>
-                    <th style="width: 25%;">NGƯỜI LIÊN QUAN</th>
-                    <th style="width: 10%;">LOẠI</th>
+                    <th style="width: 15%;">NGÀY</th>
+                    <th style="width: 20%;">NGƯỜI LIÊN QUAN</th>
+                    <th style="width: 15%;">LOẠI</th>
                     <th style="width: 15%;">SỐ TIỀN GỐC</th>
                     <th style="width: 15%;">CÒN LẠI</th>
-                    <th style="width: 15%;">TRẠNG THÁI</th>
+                    <th style="width: 10%;">TRẠNG THÁI</th>
                     <th style="width: 10%; text-align: center;">THAO TÁC</th>
                 </tr>
             </thead>
             <tbody>
-                {% for dl in debt_loans %}
+                {% for item in debt_loan_items %}
                 <tr>
-                    <td>{{ dl.NGÀY }}</td>
-                    <td>{{ dl['NGƯỜI LIÊN QUAN'] }}</td>
-                    <td class="{% if dl['LOẠI'] == 'CHO VAY' %}color-success{% else %}color-danger{% endif %}">{{ dl['LOẠI'] }}</td>
-                    <td>{{ vnd(dl['SỐ TIỀN']|abs) }} đ</td>
-                    <td>{{ vnd(dl['CÒN LẠI']|abs) }} đ</td>
-                    <td>
-                        <span class="color-secondary">{{ dl['TRẠNG THÁI'] }}</span>
+                    <td>{{ item.start_date }}</td>
+                    <td><strong>{{ item.person }}</strong></td>
+                    <td class="{% if item.loan_type == 'loan-out' %}color-success{% else %}color-danger{% endif %}">
+                        {{ 'CHO VAY' if item.loan_type == 'loan-out' else 'VAY NỢ' }}
                     </td>
-                    <td style="text-align: center;">
-                        <button class="btn btn-secondary" style="padding: 6px 10px; margin-right: 5px;">Sửa</button>
-                        <button class="btn btn-danger" style="padding: 6px 10px;">Xóa</button>
+                    <td>{{ vnd(item.total_amount) }} đ</td>
+                    <td class="color-secondary">
+                        {{ vnd(item.total_amount - item.paid_amount) }} đ
+                    </td>
+                    <td>
+                        <span class="badge">{{ item.status }}</span>
+                    </td>
+                    <td style="text-align: center; white-space: nowrap;">
+                        <button class="btn btn-secondary btn-edit-dl" 
+                                style="padding: 6px 10px;"
+                                data-id="{{ item.id }}" 
+                                data-action="{{ url_for('edit_debt_loan', id=item.id) }}"
+                                data-person="{{ item.person }}"
+                                data-total="{{ item.total_amount }}"
+                                data-paid="{{ item.paid_amount }}"
+                                data-desc="{{ item.description }}"
+                                data-date="{{ item.start_date }}"
+                                data-type="{{ item.loan_type }}">
+                            Sửa
+                        </button>
+                        
+                        <a href="{{ url_for('delete_debt_loan', id=item.id) }}" 
+                           class="btn btn-danger" 
+                           style="padding: 6px 10px; display: inline-block;"
+                           onclick="return confirm('Bạn có chắc chắn muốn xóa khoản vay/nợ này?')">
+                            Xóa
+                        </a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -74,40 +95,39 @@
                 <span class="modal-close">&times;</span>
             </div>
             
-            <form action="{{ url_for('add_debt_loan') }}" method="POST">
+            <form id="debt-loan-form" action="{{ url_for('add_debt_loan') }}" method="POST">
                 <div class="form-group">
                     <label>CHỌN LOẠI GIAO DỊCH</label>
                     <div class="toggle-group" id="debt-loan-type-toggle">
                         <input type="hidden" name="loan_type" id="loan-type-input" value="loan-out">
-
-                        <div class="toggle-btn active loan-out" data-type="loan-out">Cho Vay</div>
-                        <div class="toggle-btn loan-in" data-type="loan-in">Vay Nợ</div>
+                        <div class="toggle-btn active" data-type="loan-out">Cho Vay</div>
+                        <div class="toggle-btn" data-type="loan-in">Vay Nợ</div>
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="related_person">NGƯỜI LIÊN QUAN</label>
-                    <input type="text" id="related_person" name="related_person" required placeholder="Tên người cho vay/vay nợ">
+                    <label for="name">NGƯỜI LIÊN QUAN</label>
+                    <input type="text" name="person" id="person" required placeholder="Tên người cho vay/vay nợ">
                 </div>
 
                 <div class="form-group">
-                    <label for="amount">SỐ TIỀN GỐC (VNĐ)</label>
-                    <input type="number" id="amount" name="amount" required placeholder="0">
+                    <label for="total_amount">SỐ TIỀN GỐC (VNĐ)</label>
+                    <input type="number" name="total_amount" id="total_amount" required placeholder="0">
                 </div>
 
                 <div class="form-group">
-                    <label for="amount_paid">SỐ TIỀN ĐÃ TRẢ/NHẬN (VNĐ)</label>
-                    <input type="number" id="amount_paid" name="amount_paid" placeholder="0">
+                    <label for="paid_amount">SỐ TIỀN ĐÃ TRẢ/NHẬN (VNĐ)</label>
+                    <input type="number" name="paid_amount" id="paid_amount" value="0">
                 </div>
 
                 <div class="form-group">
                     <label for="description">MÔ TẢ</label>
-                    <textarea id="description" name="description" placeholder="Lý do cho vay/vay nợ" rows="2"></textarea>
+                    <textarea name="description" id="description" placeholder="Lý do" rows="2"></textarea>
                 </div>
                 
                 <div class="form-group">
-                    <label for="date">NGÀY</label>
-                    <input type="date" id="date" name="date" required value="{{ datetime.now().strftime('%Y-%m-%d') }}">
+                    <label for="start_date">NGÀY</label>
+                    <input type="date" name="start_date" id="start_date" required value="{{ datetime.now().strftime('%Y-%m-%d') }}">
                 </div>
 
                 <div class="modal-footer">
@@ -118,46 +138,4 @@
         </div>
     </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const modal = document.getElementById('debt-loan-modal');
-        const openBtn = document.getElementById('open-debt-loan-modal');
-        const closeBtn = modal.querySelector('.modal-close');
-        const cancelBtn = modal.querySelector('.btn-cancel');
-        const typeToggle = document.getElementById('debt-loan-type-toggle');
-        const typeInput = document.getElementById('loan-type-input');
-        
-        // Hàm mở/đóng Modal
-        const closeModal = () => { modal.style.display = 'none'; };
-        const openModal = () => { modal.style.display = 'flex'; };
-
-        // Sự kiện mở Modal
-        openBtn.addEventListener('click', openModal);
-
-        // Sự kiện đóng Modal
-        closeBtn.addEventListener('click', closeModal);
-        cancelBtn.addEventListener('click', closeModal);
-
-        // Đóng Modal khi click ra ngoài
-        window.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
-        
-        // Logic Toggle Cho Vay/Vay Nợ
-        typeToggle.querySelectorAll('.toggle-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                // Xóa active khỏi tất cả các nút
-                typeToggle.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
-                
-                // Thêm active cho nút được click
-                this.classList.add('active');
-                
-                // Cập nhật giá trị hidden input
-                typeInput.value = this.dataset.type;
-            });
-        });
-    });
-</script>
-{% endblock %}
+    {% endblock %}

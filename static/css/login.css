@@ -1,0 +1,89 @@
+/* Reset căn bản */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f8f9fa; /* Màu nền xám nhạt cho nổi form */
+}
+
+.login-container {
+    width: 100%;
+    max-width: 380px;
+    padding: 30px;
+    background: #fff;
+    text-align: center;
+}
+
+h1 {
+    font-size: 28px;
+    margin-bottom: 35px;
+    font-weight: 700;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+/* Ô nhập liệu giống y hệt trong ảnh */
+input {
+    width: 100%;
+    padding: 15px 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px; /* Bo góc tròn trịa */
+    font-size: 16px;
+    outline: none;
+    background-color: #fff;
+}
+
+input:focus {
+    border-color: #00897b; /* Hiện viền xanh khi bấm vào */
+}
+
+.forgot-password {
+    text-align: left;
+    margin-bottom: 25px;
+}
+
+.forgot-password a {
+    color: #00897b;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+/* Nút Login màu xanh Teal */
+.login-btn {
+    width: 100%;
+    padding: 15px;
+    background-color: #00897b; 
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.login-btn:hover {
+    background-color: #00695c; /* Đậm hơn tí khi di chuột vào */
+}
+
+.signup-link {
+    margin-top: 25px;
+    font-size: 14px;
+    color: #666;
+}
+
+.signup-link a {
+    color: #3c89aa;
+    text-decoration: none;
+    font-weight: 600;
+}
