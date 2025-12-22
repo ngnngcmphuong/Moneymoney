@@ -18,34 +18,47 @@
     <div class="stat-card income-card">
         <div class="stat-label">Tổng Thu (Tháng)</div>
         <div class="stat-value">{{ vnd(kpi_data.income) }}đ</div>
-        <!-- <div class="stat-change color-success">
-            ↑ 10% 
-        </div> -->
     </div>
 
     <div class="stat-card expense-card">
         <div class="stat-label">Tổng Chi (Tháng)</div>
         <div class="stat-value">{{ vnd(kpi_data.expense) }}đ</div>
-        <!-- <div class="stat-change color-danger">
-            ↓ 5% 
-        </div> -->
     </div>
 
     <div class="stat-card balance-card">
         <div class="stat-label">Số Dư Tổng</div>
         <div class="stat-value">{{ vnd(kpi_data.balance) }}đ</div>
-        <!-- <div class="stat-change color-secondary">
-             ↓ 5%
-        </div> -->
     </div>
 
     <div class="stat-card saving-card">
         <div class="stat-label">Tỷ Lệ Tiết Kiệm</div>
         <div class="stat-value">{{ kpi_data.saving_pct | default(0) | round(1) }}%</div>
-        <!-- <div class="stat-change color-success">
-            ↑ 2% 
-        </div> -->
     </div>
+</div>
+<div class="filter-section">
+    <form method="GET" class="filter-form">
+        <div class="filter-inputs">
+            <div class="input-container">
+                <label>Từ ngày</label>
+                <input type="date" name="from_date" value="{{ from_date }}">
+            </div>
+            
+            <div style="margin-top: 20px; color: #cbd5e1; font-weight: bold;">—</div>
+            
+            <div class="input-container">
+                <label>Đến ngày</label>
+                <input type="date" name="to_date" value="{{ to_date }}">
+            </div>
+        </div>
+        
+        <div class="filter-actions" style="display: flex; gap: 10px;">
+            <button type="submit" class="btn-filter">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Lọc dữ liệu
+            </button>
+            <a href="{{ request.path }}" class="btn-reset">Xóa bộ lọc</a>
+        </div>
+    </form>
 </div>
 
 <div class="charts-section">
