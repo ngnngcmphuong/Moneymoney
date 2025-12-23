@@ -89,6 +89,80 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // --- 5. LOGIC CHATBOT AI ---
+    const floatBtn = document.getElementById('ai-float-button');
+const chatWin = document.getElementById('ai-chat-window');
+const closeChat = document.getElementById('close-chat');
+const sendBtn = document.getElementById('btn-ai-send');
+const aiInput = document.getElementById('ai-chat-input');
+const chatContent = document.getElementById('ai-chat-content');
+
+if (floatBtn && chatWin) {
+    floatBtn.onclick = function (e) {
+        e.stopPropagation();
+        chatWin.classList.toggle('ai-chat-hidden');
+    };
+
+    if (closeChat) {
+        closeChat.onclick = function (e) {
+            e.stopPropagation();
+            chatWin.classList.add('ai-chat-hidden');
+        };
+    }
+
+    async function handleAISend() {
+        const text = aiInput.value.trim();
+        if (!text) return;
+
+        // Hiển thị tin nhắn của bạn
+        chatContent.innerHTML += `
+            <div style="text-align:right; margin-bottom:10px;">
+                <span style="background:#6366f1; color:white; padding:8px 12px; border-radius:12px; display:inline-block; max-width:80%; word-wrap:break-word;">
+                    ${text}
+                </span>
+            </div>`;
+        
+        aiInput.value = '';
+        chatContent.scrollTop = chatContent.scrollHeight;
+
+        try {
+            const response = await fetch('/ai-chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            const data = await response.json();
+
+            // Hiển thị câu trả lời của AI
+            chatContent.innerHTML += `
+                <div style="margin-bottom:10px;">
+                    <span style="background:#e2e8f0; color:#1e293b; padding:8px 12px; border-radius:12px; display:inline-block; max-width:80%; white-space: pre-line;">
+                        ${data.reply}
+                    </span>
+                </div>`;
+            
+            chatContent.scrollTop = chatContent.scrollHeight;
+
+            if (data.status === 'success' && !text.includes('tổng kết')) {
+                console.log("Dữ liệu đã được lưu thành công vào Database.");
+            }
+
+        } catch (e) { 
+            console.error("Lỗi kết nối AI:", e);
+            chatContent.innerHTML += `<div style="color:red; font-size:12px; margin-bottom:10px;">Lỗi: Không thể kết nối máy chủ.</div>`;
+        }
+    }
+
+    if (sendBtn) sendBtn.onclick = handleAISend;
+    if (aiInput) {
+        aiInput.onkeypress = (e) => { 
+            if (e.key === 'Enter') {
+                e.preventDefault(); 
+                handleAISend(); 
+            }
+        };
+    }
+}
     // --- 6. TOGGLE & ĐĂNG XUẤT ---
     document.querySelectorAll('.toggle-group').forEach(group => {
         group.addEventListener('click', e => {

@@ -3,7 +3,6 @@
 {% block content %}
 <h1>Theo dõi thu chi</h1>
 
-<!-- KPI -->
 <div class="row">
     <div class="col-4">
         <div class="card kpi-finance-card">
@@ -50,7 +49,6 @@
     </form>
 </div>
 
-<!-- HEADER -->
 <div class="row" style="margin-top:30px;">
     <div class="col-6">
         <h2>Lịch sử giao dịch</h2>
@@ -62,7 +60,6 @@
     </div>
 </div>
 
-<!-- TABLE -->
 <div class="card">
     <table class="data-table">
         <thead>
@@ -113,21 +110,15 @@
     </table>
 </div>
 
-<!-- MODAL -->
 <div class="modal-overlay" id="transaction-modal">
     <div class="modal-content">
         <div class="modal-header">
             Giao dịch
             <span class="modal-close">&times;</span>
         </div>
-
-        <!-- ⚠️ ACTION MẶC ĐỊNH -->
         <form id="transaction-form"
               method="POST"
               action="{{ url_for('add_transaction') }}">
-
-           
-
             <div class="toggle-group">
                  <input type="hidden"
                    name="transaction_type"
@@ -135,17 +126,14 @@
                 <div class="toggle-btn income active" data-type="income">Thu</div>
                 <div class="toggle-btn expense" data-type="expense">Chi</div>
             </div>
-
             <div class="form-group">
                 <label>SỐ TIỀN</label>
                 <input type="number" name="amount" id="amount" required>
             </div>
-
             <div class="form-group">
                 <label>MÔ TẢ</label>
                 <textarea name="description" id="description"></textarea>
             </div>
-
             <div class="form-group">
                 <label>DANH MỤC</label>
                 <select name="category_id" id="category_id" class="form-control" required>
@@ -155,12 +143,10 @@
                     {% endfor %}
                 </select>
             </div>
-
             <div class="form-group">
                 <label>NGÀY</label>
                 <input type="date" name="date" id="date" required>
             </div>
-
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-cancel">Hủy</button>
                 <button type="submit" class="btn btn-primary">Lưu</button>
